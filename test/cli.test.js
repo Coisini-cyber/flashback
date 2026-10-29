@@ -84,3 +84,13 @@ test("explain summarizes a recording", async () => {
   assert.match(stdout, /steps/);
   assert.match(stdout, /hot lines/);
 });
+
+test("export accepts -o and writes a player", async () => {
+  const dir = makeTempDir();
+  const file = path.join(dir, "trace.fb.json");
+  const out = path.join(dir, "trace.html");
+  saveRecording(sample(2), file);
+  await run(process.execPath, [bin, "export", file, "-o", out]);
+  assert.ok(fs.existsSync(out));
+  assert.match(fs.readFileSync(out, "utf8"), /const DATA = \{/);
+});

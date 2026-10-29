@@ -34,7 +34,8 @@ function parseArgs(argv, spec) {
   const positionals = [];
   const flags = {};
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+    let arg = argv[i];
+    if (/^-[A-Za-z]$/.test(arg)) arg = `--${arg.slice(1)}`;
     if (arg === "--") {
       positionals.push(...argv.slice(i + 1));
       break;
@@ -214,6 +215,11 @@ async function cmdRun(argv) {
   }
   if (s.steps === 0) {
     process.stderr.write("  ! nothing was recorded\n");
+    return;
+  }
+  if (!file) {
+    process.stderr.write("  ! the recording could not be saved\n");
+    process.exitCode = 1;
     return;
   }
   const autoReplay = process.stdout.isTTY && !flags["no-replay"] && process.stdin.isTTY;
