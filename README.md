@@ -13,6 +13,8 @@
 
 `console.log` is write-only. A live debugger is live-only — the moment you need to inspect is already gone. `flashback` records the execution first, so you can move through it in both directions afterwards, and hand the exact trace to someone else.
 
+**Live demo:** [open a crash replay](https://coisini-cyber.github.io/flashback/checkout.html) · [step backwards through a binary search](https://coisini-cyber.github.io/flashback/search.html)
+
 ```
 $ flashback run examples/checkout.js
 

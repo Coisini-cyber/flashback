@@ -13,6 +13,8 @@
 
 `console.log` 是只写的；`node --inspect` 是实时的——等你意识到要看某个值时，现场已经过去了。`flashback` 先把执行过程录下来，之后前后随意移动，也能把「案发现场」原样交给别人。
 
+**在线 demo：** [打开崩溃回放](https://coisini-cyber.github.io/flashback/checkout.html) · [倒着走一遍二分查找](https://coisini-cyber.github.io/flashback/search.html)
+
 ```
 $ flashback run examples/checkout.js
 
