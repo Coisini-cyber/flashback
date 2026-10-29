@@ -1,0 +1,10 @@
+node_modules/
+.flashback/
+.proto/
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+demo.html
+crash.html
+coverage/

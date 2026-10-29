@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flashback — examples/checkout.js</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #11161f; --panel2: #161b22; --border: #222a35;
+    --text: #d7deeb; --dim: #7d8590; --faint: #3d444d;
+    --accent: #c678dd; --blue: #61afef; --green: #98c379; --red: #e06c75; --amber: #e5c07b; --cyan: #56b6c2;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    height: 46px; flex: none; display: flex; align-items: center; gap: 14px;
+    padding: 0 16px; background: var(--panel2); border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--blue), transparent); opacity: .55; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: .2px; }
+  .brand span { color: var(--text); }
+  .entry { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spacer { flex: 1; }
+  .badge { padding: 3px 9px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); color: var(--dim); }
+  .badge.crash { color: var(--red); border-color: rgba(224,108,117,.45); background: rgba(224,108,117,.08); }
+  .badge.limit { color: var(--amber); border-color: rgba(229,192,123,.4); background: rgba(229,192,123,.08); }
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .95fr); min-height: 0; }
+  .source { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--border); }
+  .filebar { flex: none; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 14px;
+    color: var(--text); border-bottom: 1px solid var(--border); background: rgba(255,255,255,.012); }
+  .filebar .loc { color: var(--faint); }
+  .code { flex: 1; overflow: auto; padding: 8px 0 90px; scroll-behavior: smooth; }
+  .line { display: flex; padding: 0 14px 0 0; min-height: 20px; border-left: 2px solid transparent; }
+  .line:hover { background: rgba(255,255,255,.025); }
+  .line.active { background: rgba(97,175,239,.10); border-left-color: var(--accent); }
+  .line.active .no { color: var(--accent); }
+  .no { flex: none; width: 52px; text-align: right; padding-right: 12px; color: var(--faint);
+    user-select: none; cursor: pointer; }
+  .line .src { white-space: pre; }
+  .tok-kw { color: var(--accent); font-weight: 600; }
+  .tok-str { color: var(--green); }
+  .tok-num { color: var(--amber); }
+  .tok-com { color: #5c6370; font-style: italic; }
+  .tok-fn { color: var(--blue); }
+  .tok-type { color: var(--amber); }
+  .tok-punct { color: #8b93a7; }
+  aside { overflow: auto; padding: 12px 14px 90px; background: var(--panel); }
+  .pane { margin-bottom: 18px; }
+  .pane h2 { margin: 0 0 7px; font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--faint); font-weight: 600; }
+  .scope { margin: 0 0 9px; }
+  .scope-name { color: var(--faint); font-size: 10px; margin-bottom: 2px; }
+  .var { display: flex; gap: 6px; align-items: baseline; padding: 1px 4px; border-radius: 3px; }
+  .var.changed { background: rgba(229,192,123,.08); }
+  .var .dot { width: 7px; flex: none; color: var(--amber); }
+  .var .name { color: var(--blue); flex: none; max-width: 38%; overflow: hidden; text-overflow: ellipsis; }
+  .var .eq { color: var(--faint); }
+  .var .val { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .var .val.s { color: var(--green); } .var .val.n { color: var(--amber); }
+  .var .val.u { color: var(--dim); } .var .val.f { color: var(--blue); }
+  .var .val.e { color: var(--red); }
+  .frame { display: flex; gap: 8px; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+  .frame:hover { background: rgba(255,255,255,.03); }
+  .frame.sel { background: rgba(97,175,239,.12); }
+  .frame .fn { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frame.sel .fn { color: var(--text); }
+  .frame .where { margin-left: auto; color: var(--faint); font-size: 11px; flex: none; }
+  .empty { color: var(--faint); font-style: italic; }
+  footer { flex: none; background: var(--panel2); border-top: 1px solid var(--border); padding: 8px 14px 10px; }
+  .controls { display: flex; align-items: center; gap: 8px; }
+  button { background: transparent; color: var(--dim); border: 1px solid var(--border); border-radius: 5px;
+    width: 30px; height: 26px; cursor: pointer; font-family: var(--mono); font-size: 11px; }
+  button:hover { color: var(--text); border-color: var(--faint); }
+  button.primary { color: var(--accent); border-color: rgba(198,120,221,.5); }
+  input[type=range] { flex: 1; appearance: none; height: 4px; border-radius: 2px; outline: none;
+    background: linear-gradient(90deg, var(--accent), var(--blue)); opacity: .85; }
+  input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--text); border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--text);
+    border: 2px solid var(--bg); cursor: pointer; }
+  .counter { color: var(--dim); font-size: 11.5px; min-width: 128px; text-align: right; }
+  .hint { color: var(--faint); font-size: 10.5px; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .hint b { color: var(--dim); font-weight: 500; }
+  .crashbar { flex: none; padding: 7px 14px; background: rgba(224,108,117,.10);
+    border-bottom: 1px solid rgba(224,108,117,.35); color: var(--red); font-size: 11.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crashbar.hidden { display: none; }
+  mark { background: rgba(229,192,123,.25); color: var(--amber); border-radius: 2px; padding: 0 1px; }
+  @media (max-width: 780px) {
+    main { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 1fr) auto; }
+    .source { border-right: 0; border-bottom: 1px solid var(--border); }
+    aside { max-height: 38vh; }
+    .counter { min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">◆ <span>flashback</span></div>
+  <div class="entry" id="entry">examples/checkout.js</div>
+  <div class="spacer"></div>
+  <div class="badge" id="badge">5 steps</div>
+</header>
+<div class="crashbar hidden" id="crashbar"></div>
+<main>
+  <section class="source">
+    <div class="filebar"><span id="filename"></span><span class="loc" id="loc"></span></div>
+    <div class="code" id="code"></div>
+  </section>
+  <aside>
+    <div class="pane"><h2>state</h2><div id="vars"></div></div>
+    <div class="pane" id="watchpane" style="display:none"><h2>watch</h2><div id="watches"></div></div>
+    <div class="pane"><h2>call stack</h2><div id="stack"></div></div>
+  </aside>
+</main>
+<footer>
+  <div class="controls">
+    <button id="first" title="first step">⏮</button>
+    <button id="prev" title="previous">◀</button>
+    <button id="play" class="primary" title="play / pause">▶</button>
+    <button id="next" title="next">▶</button>
+    <button id="last" title="last step">⏭</button>
+    <input type="range" id="slider" min="0" max="5" value="4">
+    <span class="counter" id="counter"></span>
+  </div>
+  <div class="hint"><span><b>← →</b> step</span><span><b>shift</b> ±10</span><span><b>space</b> play</span><span><b>↑ ↓</b> frame</span><span><b>click a line</b> jump to it</span></div>
+</footer>
+<script>
+const DATA = {"entry":"examples/checkout.js","steps":[{"file":"examples/checkout.js","line":21,"column":17,"fn":"\u003canonymous>","t":106,"stack":[{"file":"examples/checkout.js","line":21,"column":17,"fn":"\u003canonymous>","scopes":[]}],"watches":[]},{"file":"examples/checkout.js","line":27,"column":17,"fn":"\u003canonymous>","t":106,"stack":[{"file":"examples/checkout.js","line":27,"column":17,"fn":"\u003canonymous>","scopes":[]}],"watches":[]},{"file":"examples/checkout.js","line":17,"column":17,"fn":"checkout","t":107,"stack":[{"file":"examples/checkout.js","line":17,"column":17,"fn":"checkout","scopes":[{"type":"local","name":"checkout","vars":[{"name":"raw","value":{"t":"string","v":"{\"id\":\"A-1042\",\"lineItems\":[{\"price\":42,\"qty\":3}],\"currency\":\"EUR\"}"}}]}]},{"file":"examples/checkout.js","line":27,"column":17,"fn":"\u003canonymous>","scopes":[]}],"watches":[]},{"file":"examples/checkout.js","line":5,"column":17,"fn":"parseOrder","t":107,"stack":[{"file":"examples/checkout.js","line":5,"column":17,"fn":"parseOrder","scopes":[{"type":"local","name":"parseOrder","vars":[{"name":"raw","value":{"t":"string","v":"{\"id\":\"A-1042\",\"lineItems\":[{\"price\":42,\"qty\":3}],\"currency\":\"EUR\"}"}}]}]},{"file":"examples/checkout.js","line":17,"column":17,"fn":"checkout","scopes":[{"type":"local","name":"checkout","vars":[{"name":"raw","value":{"t":"string","v":"{\"id\":\"A-1042\",\"lineItems\":[{\"price\":42,\"qty\":3}],\"currency\":\"EUR\"}"}}]}]},{"file":"examples/checkout.js","line":27,"column":17,"fn":"\u003canonymous>","scopes":[]}],"watches":[]},{"file":"examples/checkout.js","line":6,"column":23,"fn":"parseOrder","t":108,"stack":[{"file":"examples/checkout.js","line":6,"column":23,"fn":"parseOrder","scopes":[{"type":"local","name":"parseOrder","vars":[{"name":"raw","value":{"t":"string","v":"{\"id\":\"A-1042\",\"lineItems\":[{\"price\":42,\"qty\":3}],\"currency\":\"EUR\"}"}},{"name":"order","value":{"t":"object","c":"Object","d":"Object","p":[["id","\"A-1042\""],["lineItems","object"],["currency","\"EUR\""]]}}]}]},{"file":"examples/checkout.js","line":17,"column":17,"fn":"checkout","scopes":[{"type":"local","name":"checkout","vars":[{"name":"raw","value":{"t":"string","v":"{\"id\":\"A-1042\",\"lineItems\":[{\"price\":42,\"qty\":3}],\"currency\":\"EUR\"}"}}]}]},{"file":"examples/checkout.js","line":27,"column":17,"fn":"\u003canonymous>","scopes":[]}],"watches":[],"exception":{"t":"error","c":"TypeError","d":"TypeError: Cannot read properties of undefined (reading 'reduce')\n    at parseOrder (file:///D:/project/examples/checkout.js:6:29)\n    at checkout (file:///D:/project/examples/checkout.js:17:17)\n    …","p":[["stack","\"TypeError: Cannot read properties of undefined (re…hESMLoader (node:internal/m…"],["message","\"Cannot read properties of undefined (reading 'reduce')\""]]}}],"files":{"examples/checkout.js":{"source":"// A crash that is easy to spot and hard to explain: the upstream payload uses\n// `lineItems`, but this function expects `items`.\n// Run: flashback run examples/checkout.js\nfunction parseOrder(raw) {\n  const order = JSON.parse(raw);\n  const total = order.items.reduce((sum, item) => sum + item.price * item.qty, 0);\n  if (!order.currency) throw new Error(\"order is missing a currency\");\n  return { id: order.id, total, currency: order.currency };\n}\n\nfunction applyDiscount(order) {\n  const rate = order.total > 100 ? 0.1 : 0.05;\n  return { ...order, total: order.total * (1 - rate) };\n}\n\nfunction checkout(raw) {\n  const order = parseOrder(raw);\n  return applyDiscount(order);\n}\n\nconst payload = JSON.stringify({\n  id: \"A-1042\",\n  lineItems: [{ price: 42, qty: 3 }],\n  currency: \"EUR\",\n});\n\nconst receipt = checkout(payload);\nconsole.log(\"receipt\", receipt);\n","lang":"js"}},"output":[],"exit":{"reason":"exception","description":{"t":"error","c":"TypeError","d":"TypeError: Cannot read properties of undefined (reading 'reduce')\n    at parseOrder (file:///D:/project/examples/checkout.js:6:29)\n    at checkout (file:///D:/project/examples/checkout.js:17:17)\n    …","p":[["stack","\"TypeError: Cannot read properties of undefined (re…hESMLoader (node:internal/m…"],["message","\"Cannot read properties of undefined (reading 'reduce')\""]]}},"watches":[],"createdAt":"2026-10-29T05:06:58.927Z"};
+const state = { i: 4, frame: 0, playing: null };
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+
+const KEYWORDS = new Set("as async await break case catch class const continue debugger default delete do else enum export extends false finally for from function get if implements import in instanceof interface let new null of return set static super switch this throw true try type typeof undefined var void while with yield satisfies namespace declare readonly public private protected abstract keyof infer asserts is".split(" "));
+const TOKEN = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|(`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d[\w.]*\b)|([A-Za-z_$][\w$]*)|([{}()\[\];,.]|=>|[=+\-*/%<>!&|?:]+)/g;
+
+function tokenize(line) {
+  const out = []; let last = 0; let m; TOKEN.lastIndex = 0;
+  while ((m = TOKEN.exec(line)) !== null) {
+    if (m.index > last) out.push([line.slice(last, m.index), ""]);
+    const text = m[0];
+    let cls = "";
+    if (m[1] || m[2]) cls = "com";
+    else if (m[3]) cls = "str";
+    else if (m[4]) cls = "num";
+    else if (m[5]) {
+      const after = line.slice(m.index + text.length);
+      cls = KEYWORDS.has(text) ? "kw" : /^\s*\(/.test(after) ? "fn" : /^[A-Z]/.test(text) ? "type" : "";
+    } else if (m[6]) cls = "punct";
+    out.push([text, cls]);
+    last = m.index + text.length;
+  }
+  if (last < line.length) out.push([line.slice(last), ""]);
+  return out;
+}
+
+function fmt(v, max) {
+  max = max || 160;
+  if (!v) return "undefined";
+  const cut = (s) => (s.length > max ? s.slice(0, max - 1) + "…" : s);
+  if (v.t === "string") { try { return cut(JSON.stringify(v.v || "")); } catch { return cut(v.v || ""); } }
+  if (v.t === "number" || v.t === "bigint") return String(v.v);
+  if (v.t === "boolean") return v.v ? "true" : "false";
+  if (v.t === "undefined") return "undefined";
+  if (v.t === "null") return "null";
+  if (v.t === "symbol") return cut(v.d || "Symbol()");
+  if (v.t === "function") { const n = /\bfunction\s+([\w$]+)/.exec(v.d || ""); return n ? "ƒ " + n[1] + "()" : "ƒ ()"; }
+  if (v.t === "error") return cut(v.d || "Error");
+  if (v.p && v.p.length) {
+    const inner = v.p.map((p) => v.t === "array" ? p[1] : p[0] + ": " + p[1]).join(", ");
+    const open = v.t === "array" ? "[" : (v.c && v.c !== "Object" ? v.c + " {" : "{");
+    return cut((open + " " + inner + (v.o ? ", +" + v.o : "") + (v.t === "array" ? "]" : "}")).replace(/\s+/g, " "));
+  }
+  return cut(v.d || "{}");
+}
+function valClass(v) {
+  if (!v) return "u";
+  if (v.t === "string") return "s";
+  if (v.t === "number" || v.t === "bigint" || v.t === "boolean") return "n";
+  if (v.t === "undefined" || v.t === "null") return "u";
+  if (v.t === "function") return "f";
+  if (v.t === "error") return "e";
+  return "";
+}
+
+const codeEl = $("code");
+const fileCache = new Map();
+let activeFile = null;
+let lineNodes = new Map();
+
+function fileDom(file) {
+  if (fileCache.has(file)) return fileCache.get(file);
+  const wrap = document.createDocumentFragment();
+  const lines = (DATA.files[file] ? DATA.files[file].source : "").split(/\r?\n/);
+  const nodes = new Map();
+  const digits = String(lines.length).length;
+  lines.forEach((line, idx) => {
+    const row = el("div", "line");
+    row.dataset.line = String(idx + 1);
+    const no = el("span", "no", String(idx + 1).padStart(digits));
+    no.title = "jump to a step at this line";
+    no.onclick = () => jumpToLine(file, idx + 1);
+    row.appendChild(no);
+    const src = el("span", "src");
+    for (const [text, cls] of tokenize(line)) {
+      if (cls) src.appendChild(el("span", "tok-" + cls, text));
+      else src.appendChild(document.createTextNode(text));
+    }
+    row.appendChild(src);
+    wrap.appendChild(row);
+    nodes.set(idx + 1, row);
+  });
+  const dom = { frag: wrap, nodes };
+  fileCache.set(file, dom);
+  return dom;
+}
+
+function showFile(file) {
+  if (activeFile === file) return;
+  activeFile = file;
+  codeEl.textContent = "";
+  const dom = fileDom(file);
+  codeEl.appendChild(dom.frag.cloneNode(true));
+  lineNodes = new Map();
+  codeEl.querySelectorAll(".line").forEach((n) => lineNodes.set(Number(n.dataset.line), n));
+  codeEl.querySelectorAll(".no").forEach((n) => { n.onclick = () => jumpToLine(file, Number(n.textContent)); });
+  $("filename").textContent = file;
+}
+
+function jumpToLine(file, line) {
+  for (let k = 0; k < DATA.steps.length; k++) {
+    const s = DATA.steps[(state.i + k) % DATA.steps.length];
+    if (s.file === file && s.line === line) { setStep((state.i + k) % DATA.steps.length); return; }
+  }
+}
+
+function prevFrame(index, step, frameIndex) {
+  if (index <= 0) return null;
+  const prev = DATA.steps[index - 1];
+  const f = prev.stack[Math.min(frameIndex, prev.stack.length - 1)];
+  const cur = step.stack[Math.min(frameIndex, step.stack.length - 1)];
+  return f && cur && f.fn === cur.fn ? f : null;
+}
+
+function renderVars(step) {
+  const box = $("vars");
+  box.textContent = "";
+  const f = step.stack[Math.min(state.frame, step.stack.length - 1)];
+  if (!f || !f.scopes || !f.scopes.length) { box.appendChild(el("div", "empty", "no locals captured for this frame")); return; }
+  const prev = prevFrame(state.i, step, state.frame);
+  const before = new Map();
+  if (prev && prev.scopes) for (const sc of prev.scopes) for (const v of sc.vars) before.set(v.name, v.value);
+  for (const scope of f.scopes) {
+    const wrap = el("div", "scope");
+    wrap.appendChild(el("div", "scope-name", scope.type));
+    for (const v of scope.vars) {
+      const changed = before.has(v.name) && fmt(before.get(v.name), 9999) !== fmt(v.value, 9999);
+      const row = el("div", "var" + (changed ? " changed" : ""));
+      row.appendChild(el("span", "dot", changed ? "•" : ""));
+      row.appendChild(el("span", "name", v.name));
+      row.appendChild(el("span", "eq", "="));
+      const val = el("span", "val " + valClass(v.value), fmt(v.value, 120));
+      if (changed) val.title = "was " + fmt(before.get(v.name), 300);
+      row.appendChild(val);
+      wrap.appendChild(row);
+    }
+    box.appendChild(wrap);
+  }
+}
+
+function renderStack(step) {
+  const box = $("stack");
+  box.textContent = "";
+  step.stack.forEach((f, i) => {
+    const row = el("div", "frame" + (i === state.frame ? " sel" : ""));
+    row.appendChild(el("span", "fn", (i === 0 ? "▸ " : "") + f.fn));
+    row.appendChild(el("span", "where", f.file.split("/").slice(-2).join("/") + ":" + f.line));
+    row.onclick = () => { state.frame = i; render(); };
+    box.appendChild(row);
+  });
+}
+
+function renderWatches(step) {
+  const pane = $("watchpane");
+  const box = $("watches");
+  box.textContent = "";
+  if (!step.watches || !step.watches.length) { pane.style.display = "none"; return; }
+  pane.style.display = "";
+  for (const w of step.watches) {
+    const row = el("div", "var");
+    row.appendChild(el("span", "dot", ""));
+    row.appendChild(el("span", "name", w.expr));
+    row.appendChild(el("span", "eq", "="));
+    row.appendChild(el("span", "val " + (w.error ? "e" : ""), w.error ? w.error : fmt(w.value, 140)));
+    box.appendChild(row);
+  }
+}
+
+function render() {
+  const step = DATA.steps[state.i];
+  if (!step) return;
+  state.frame = Math.min(state.frame, step.stack.length - 1);
+  showFile(step.file);
+  lineNodes.forEach((n) => n.classList.remove("active"));
+  const node = lineNodes.get(step.line);
+  if (node) {
+    node.classList.add("active");
+    node.scrollIntoView({ block: "center", behavior: state.playing ? "auto" : "smooth" });
+  }
+  $("loc").textContent = "line " + step.line + " · " + step.fn;
+  renderVars(step);
+  renderStack(step);
+  renderWatches(step);
+  $("slider").value = String(state.i);
+  $("counter").textContent = (state.i + 1) + " / " + DATA.steps.length + "  ·  +" + step.t + "ms";
+  $("play").textContent = state.playing ? "❚❚" : "▶";
+  if (location.hash !== "#s=" + (state.i + 1)) {
+    try { history.replaceState(null, "", "#s=" + (state.i + 1)); } catch (e) {}
+  }
+}
+
+function setStep(i) {
+  state.i = Math.max(0, Math.min(DATA.steps.length - 1, i));
+  render();
+}
+
+function play() {
+  if (state.playing) { clearInterval(state.playing); state.playing = null; render(); return; }
+  if (state.i >= DATA.steps.length - 1) state.i = 0;
+  state.playing = setInterval(() => {
+    if (state.i >= DATA.steps.length - 1) { clearInterval(state.playing); state.playing = null; render(); return; }
+    state.i++; render();
+  }, 280);
+  render();
+}
+
+$("prev").onclick = () => setStep(state.i - 1);
+$("next").onclick = () => setStep(state.i + 1);
+$("first").onclick = () => setStep(0);
+$("last").onclick = () => setStep(DATA.steps.length - 1);
+$("play").onclick = play;
+$("slider").max = String(DATA.steps.length - 1);
+$("slider").oninput = (e) => { if (state.playing) play(); setStep(Number(e.target.value)); };
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); setStep(state.i - (e.shiftKey ? 10 : 1)); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); setStep(state.i + (e.shiftKey ? 10 : 1)); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); state.frame = Math.max(0, state.frame - 1); render(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); state.frame = Math.min(DATA.steps[state.i].stack.length - 1, state.frame + 1); render(); }
+  else if (e.key === " ") { e.preventDefault(); play(); }
+  else if (e.key === "Home") { e.preventDefault(); setStep(0); }
+  else if (e.key === "End") { e.preventDefault(); setStep(DATA.steps.length - 1); }
+});
+
+if (DATA.exit && DATA.exit.reason === "exception") {
+  const d = DATA.exit.description || {};
+  const text = d.d || "uncaught exception";
+  $("crashbar").textContent = "✖ crashed — " + text.split("\n")[0];
+  $("crashbar").classList.remove("hidden");
+  $("badge").textContent = "crashed";
+  $("badge").classList.add("crash");
+} else if (DATA.exit && DATA.exit.reason === "max-steps") {
+  $("badge").textContent = "step limit";
+  $("badge").classList.add("limit");
+} else if (DATA.exit) {
+  $("badge").textContent = DATA.exit.reason === "exit" ? "completed" : DATA.exit.reason;
+}
+const m = /#s=(\d+)/.exec(location.hash);
+if (m) state.i = Math.max(0, Math.min(DATA.steps.length - 1, Number(m[1]) - 1));
+render();
+</script>
+</body>
+</html>

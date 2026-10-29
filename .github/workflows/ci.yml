@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test
+      - run: node bin/flashback.js run examples/binary-search.js --no-replay --max-steps 100
+      - run: node bin/flashback.js explain
+      - run: node bin/flashback.js export -o /tmp/trace.html
+        if: runner.os != 'Windows'
+      - run: node bin/flashback.js export -o ${{ runner.temp }}/trace.html
+        if: runner.os == 'Windows'

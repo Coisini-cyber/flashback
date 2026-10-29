@@ -1,0 +1,46 @@
+{
+  "name": "flashback-debug",
+  "version": "0.1.0",
+  "description": "Time-travel debugging for Node.js. Record a run, step backwards, share the trace.",
+  "type": "module",
+  "bin": {
+    "flashback": "./bin/flashback.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node scripts/make-demo.js",
+    "lint": "node --check bin/flashback.js"
+  },
+  "keywords": [
+    "debugger",
+    "time-travel",
+    "nodejs",
+    "record-replay",
+    "devtools",
+    "cli",
+    "tui"
+  ],
+  "license": "MIT",
+  "author": "Sixian Deng",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Coisini-cyber/flashback.git"
+  },
+  "homepage": "https://github.com/Coisini-cyber/flashback#readme",
+  "bugs": {
+    "url": "https://github.com/Coisini-cyber/flashback/issues"
+  }
+}
